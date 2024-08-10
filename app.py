@@ -1,45 +1,89 @@
 import streamlit as st
-from googlesearch import search
-from urllib.parse import urlparse, unquote
+import requests
+from bs4 import BeautifulSoup
+import time
+import random
 
-# Function to perform a Google search using googlesearch-python
-def google_dork_search(query, num_results=10):
-    try:
-        search_results = search(query, num_results=num_results, lang="en")
-        return list(search_results)
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+def google_pdf_search(query, num_results=10):
+    # Delay to mimic human behavior and avoid rapid request detection
+    time.sleep(random.uniform(1, 3))
+    
+    search_url = f"https://www.google.com/search?q=filetype:pdf+{query}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
+    response = requests.get(search_url, headers=headers)
+    
+    if response.status_code == 200:
+        soup = BeautifulSoup(response.text, 'html.parser')
+        results = []
+        g_results = soup.find_all('div', class_='g')
+        
+        for g in g_results[:num_results]:  # Limit the number of results
+            link = g.find('a', href=True)
+            title = g.find('h3')
+            if link and title:
+                href = link['href']
+                url = href.split("&")[0].split("?q=")[-1]
+                results.append((title.text, url))
+        
+        return results
+    else:
         return []
 
-# Function to extract PDF name from URL
-def extract_pdf_name(url):
-    path = urlparse(url).path
-    filename = unquote(path.split('/')[-1])
-    if filename.endswith('.pdf'):
-        return filename
-    else:
-        return "Unknown PDF"
-
-# Streamlit App
 def main():
     st.set_page_config(page_title="Nami's Library", layout="wide")
     st.title("📚 Nami's Library: Discover PDF Books")
+    st.subheader("Explore a vast collection of PDF books across the web")
 
-    with st.form("book_search"):
-        book_title = st.text_input("Enter the book title:", help="Type the title of the book you want to find.")
-        submitted = st.form_submit_button("Search")
+    query = st.text_input("Enter your search query for PDFs:", help="Search for PDF books by titles, authors, or topics.")
 
-    if submitted and book_title:
-        with st.spinner('Searching for treasure... 🗺️'):
-            google_dork_query = f'intitle:"{book_title}" filetype:pdf'
-            urls = google_dork_search(google_dork_query)
-            if urls:
-                st.success(f"Found {len(urls)} treasures!")
-                for i, url in enumerate(urls, start=1):
-                    pdf_name = extract_pdf_name(url)
-                    st.write(f"{i}. **{pdf_name}** - [Download PDF]({url})")
+    if st.button("Search PDFs"):
+        if query:
+            with st.spinner("🔎 Searching PDFs across the web... Please wait."):
+                results = google_pdf_search(query)
+            if results:
+                st.success(f"✨ Found {len(results)} results:")
+                for title, link in results:
+                    st.markdown(f"[{title}]({link})", unsafe_allow_html=True)
             else:
-                st.error("No treasures found. Try adjusting your map!")
+                st.warning("🚫 No results found. Try a different query.")
+        else:
+            st.warning("⚠️ Please enter a query to begin searching.")
+
+    # Add an animated footer with the creator's name
+    st.markdown(
+        """
+        <style>
+        .footer {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: white;
+            text-align: center;
+            padding: 10px;
+            font-size: 14px;
+            color: black;
+            animation: fadeInAnimation ease 3s;
+            animation-iteration-count: 1;
+            animation-fill-mode: forwards;
+        }
+        @keyframes fadeInAnimation {
+            0% {
+                opacity: 0;
+            }
+            100% {
+                opacity: 1;
+            }
+        }
+        </style>
+        <div class="footer">
+        Created by Deviprasad Shetty
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
 if __name__ == "__main__":
     main()
